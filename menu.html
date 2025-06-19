@@ -35,6 +35,8 @@
 	<script type="text/javascript" src="js/menu/TestData.js"></script>
 	<script type="text/javascript" src="js/menu/TestServers.js"></script>
 	<script type="text/javascript" src="js/menu/TestWorkshop.js"></script>
+
+	<script type="text/javascript" src="js/server-button.js"></script>
 </head>
 
 <body ng-app="MenuApp" ng-controller="MenuController">
@@ -71,6 +73,11 @@
 				<number ng-show="ProblemCount > 0"
 					class="{{IfElse( ProblemSeverity > 0, 'severity' + ProblemSeverity, '' )}}">{{ProblemCount}}
 				</number>
+			</li>
+			<li class="smallicon" onmousedown="handleServerButton(event)" oncontextmenu="return false"
+				style="position: relative; right: 10px;">
+				<img src='img/zarp.png'
+					style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; margin: 0;">
 			</li>
 		</ul>
 
