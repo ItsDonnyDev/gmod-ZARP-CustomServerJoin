@@ -3,19 +3,19 @@
 
 	var css = `
 		#server_popup {
-			position: absolute;
+			position: fixed;
 			bottom: 60px;
-			right: 220px;
 			background: #fff;
 			border: 3px solid #333;
 			border-radius: 4px;
-			padding: 10px;
-			width: 140px !important;
+			padding: 8px 4px;
 			box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+			box-sizing: border-box;
+			margin: 0;
 		}
 
 		.server_item {
-			padding: 8px;
+			padding: 6px 4px;
 			margin: 5px 0;
 			border-radius: 3px;
 			background: #f5f5f5;
@@ -28,8 +28,8 @@
 			content: '';
 			position: absolute;
 			bottom: 0;
-			left: 4px;
-			right: 3px;
+			left: 2px;
+			right: 2px;
 			height: 1px;
 			background: #aaaaaa;
 		}
@@ -138,13 +138,36 @@
 		});
 	}
 
+	function getButtons() {
+		var rightGroup = document.querySelector('#NavBar .group.right');
+		if (!rightGroup) return null;
+		var serverBtn = rightGroup.querySelector('.button[onmousedown^="handleServerButton"]');
+		var problemsBtn = rightGroup.querySelector('[ng-click="ToggleProblems()"]');
+		if (!serverBtn || !problemsBtn) return null;
+		return { serverBtn: serverBtn, problemsBtn: problemsBtn };
+	}
+
+	function alignPopup() {
+		var popup = document.getElementById('server_popup');
+		if (!popup || popup.style.display === 'none') return;
+		var btns = getButtons();
+		if (!btns) return;
+		var srvRect = btns.serverBtn.getBoundingClientRect();
+		var prbRect = btns.problemsBtn.getBoundingClientRect();
+		var left = Math.round(srvRect.left);
+		var right = Math.round(prbRect.right);
+		var width = Math.max(120, right - left);
+		popup.style.left = left + 'px';
+		popup.style.width = width + 'px';
+	}
+
 	function toggleServerPopup() {
 		var popup = document.getElementById('server_popup');
 		if (popup.style.display === 'none' || !popup.style.display) {
 			$('.popup').hide();
 			serverList.forEach(queryServerData);
 			popup.style.display = 'block';
-			setTimeout(refreshServerPopup, 100);
+			window.requestAnimationFrame(function () { alignPopup(); refreshServerPopup(); });
 		} else {
 			popup.style.display = 'none';
 		}
