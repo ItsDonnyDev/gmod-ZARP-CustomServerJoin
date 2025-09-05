@@ -62,7 +62,7 @@
 		}
 	`;
 
-	var privateServer = { address: "192.168.0.2:27016", password: "REDACTED" };
+	var privateServer = { address: "192.168.0.2:27016", password: "Rj2285df" };
 	var serverList = [
 		{ alias: "SSRP", address: "198.244.254.83:27015", password: "" },
 		{ alias: "PROPHUNT", address: "198.244.254.83:27040", password: "" },
