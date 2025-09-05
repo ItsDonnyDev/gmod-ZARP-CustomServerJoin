@@ -7,30 +7,25 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: One Discord message per commit
-        env:
-          API_URL: ${{ secrets.DISCORD_NOTIFY }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
-          FALLBACK_ACTOR: ${{ github.actor }}
-        shell: bash
-        run: |
-          echo '${{ toJSON(github.event.commits) }}' > commits.json
-          jq -c '.[]' commits.json | while read -r c; do
-            msg=$(echo "$c" | jq -r '.message')
-            ts=$(echo "$c" | jq -r '.timestamp')
-            author=$(echo "$c" | jq -r '.author.username // .author.name // empty')
-            if [ -z "$author" ]; then author="$FALLBACK_ACTOR"; fi
-
-            payload=$(jq -n \
-              --arg repo "$REPO" \
-              --arg branch "$BRANCH" \
-              --arg actor "$author" \
-              --arg message "$msg" \
-              --arg timestamp "$ts" \
-              '{repo:$repo, branch:$branch, actor:$actor, message:$message, timestamp:$timestamp}')
-
-            curl -sS -X POST "$API_URL" \
-              -H 'Content-Type: application/json' \
-              -d "$payload" >/dev/null
-          done
+      - name: One Discord message (latest commit only)
+    env:
+      API_URL: ${{ secrets.DISCORD_NOTIFY }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      ACTOR_USER: ${{ github.event.head_commit.author.username }}
+      ACTOR_NAME: ${{ github.event.head_commit.author.name }}
+      MSG: ${{ toJSON(github.event.head_commit.message) }}
+      TS: ${{ github.event.head_commit.timestamp }}
+      shell: bash
+      run: |
+        author="$ACTOR_USER"
+        if [ -z "$author" ] || [ "$author" = "null" ]; then author="$ACTOR_NAME"; fi
+    
+        jq -n \
+          --arg repo "$REPO" \
+          --arg branch "$BRANCH" \
+          --arg actor "$author" \
+          --arg message "$MSG" \
+          --arg timestamp "$TS" \
+          '{repo:$repo, branch:$branch, actor:$actor, message:$message, timestamp:$timestamp}' \
+        | curl -sS -X POST "$API_URL" -H 'Content-Type: application/json' -d @-
