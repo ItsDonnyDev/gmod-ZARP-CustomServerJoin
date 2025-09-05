@@ -1,0 +1,36 @@
+name: Discord per-commit
+
+on:
+  push:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: One Discord message per commit
+        env:
+          API_URL: ${{ secrets.DISCORD_NOTIFY }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          FALLBACK_ACTOR: ${{ github.actor }}
+        shell: bash
+        run: |
+          echo '${{ toJSON(github.event.commits) }}' > commits.json
+          jq -c '.[]' commits.json | while read -r c; do
+            msg=$(echo "$c" | jq -r '.message')
+            ts=$(echo "$c" | jq -r '.timestamp')
+            author=$(echo "$c" | jq -r '.author.username // .author.name // empty')
+            if [ -z "$author" ]; then author="$FALLBACK_ACTOR"; fi
+
+            payload=$(jq -n \
+              --arg repo "$REPO" \
+              --arg branch "$BRANCH" \
+              --arg actor "$author" \
+              --arg message "$msg" \
+              --arg timestamp "$ts" \
+              '{repo:$repo, branch:$branch, actor:$actor, message:$message, timestamp:$timestamp}')
+
+            curl -sS -X POST "$API_URL" \
+              -H 'Content-Type: application/json' \
+              -d "$payload" >/dev/null
+          done
