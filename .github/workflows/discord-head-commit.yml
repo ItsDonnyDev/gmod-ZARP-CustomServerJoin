@@ -18,40 +18,28 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "${COMMITS_JSON:-[]}"  > commits.json
-          echo "${HEAD_JSON:-null}"   > head.json
+          repo_short="${REPO#*/}"
 
-          jq -cs '
-            (.[0] // []) as $c |
-            (.[1] // null) as $h |
-            ($c + (if $h==null then [] else [$h] end))
-            | map(select(.id?))
-            | unique_by(.id)
-            | sort_by(.timestamp // "")
-          ' commits.json head.json > list.json
+          combined="$(
+            jq -cs '
+              (.[0] // []) as $c | (.[1] // null) as $h |
+              ($c + (if $h==null then [] else [$h] end))
+              | map(select(.id?)) | unique_by(.id) | sort_by(.timestamp // "")
+            ' <(printf '%s' "${COMMITS_JSON:-[]}") <(printf '%s' "${HEAD_JSON:-null}")
+          )"
 
-          repo_short="$(awk -F/ '{print ($2?$2:$0)}' <<< "$REPO")"
-
-          jq -c '.[] | {id, url, message, timestamp, author}' list.json | while read -r c; do
+          jq -c '.[] | {id, message, timestamp, author}' <<< "$combined" | while read -r c; do
             id="$(jq -r '.id // empty' <<< "$c")"
-            url="$(jq -r '.url // empty' <<< "$c")"
+            short="${id:0:7}"
+            url="https://github.com/$REPO/commit/$id"
             msg="$(jq -r '.message // ""' <<< "$c")"
             ts="$(jq -r '.timestamp // empty' <<< "$c")"
-            login="$(jq -r '.author.username // empty' <<< "$c")"
-            [ -z "$login" ] && login="$ACTOR_FALLBACK"
-
-            [ -z "$url" ] && [ -n "$id" ] && url="https://github.com/$REPO/commit/$id"
-            short="${id:0:7}"
-            desc="[$short]($url)\n$msg"
-
-            if [ -z "$ts" ] || ! date -d "$ts" >/dev/null 2>&1; then ts="$(date -Iseconds)"; fi
-            iso_utc="$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")"
 
             jq -n \
-              --arg login "$login" \
-              --arg desc "$desc" \
+              --arg login "$(jq -r --arg fb "$ACTOR_FALLBACK" '(.author.username // "") | if length==0 then $fb else . end' <<< "$c")" \
+              --arg desc "[$short]($url)\n$msg" \
               --arg foot "$repo_short - $BRANCH" \
-              --arg iso "$iso_utc" \
+              --arg iso  "$(date -u -d "${ts:-$(date -Iseconds)}" +'%Y-%m-%dT%H:%M:%SZ')" \
               '{
                 username: "GitHub",
                 avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
