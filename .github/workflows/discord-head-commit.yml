@@ -1,5 +1,4 @@
 name: Discord notify
-
 on:
   push:
 
@@ -19,13 +18,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Normalize inputs
-          echo "${COMMITS_JSON:-[]}" | jq 'if .==null then [] else . end' > commits.json
-          echo "${HEAD_JSON:-null}"   | jq '.' > head.json
+          echo "${COMMITS_JSON:-[]}"  > commits.json
+          echo "${HEAD_JSON:-null}"   > head.json
 
           # Combine commits + head_commit, de-dup by id, sort by timestamp
           jq -cs '
-            (.[0] // []) + (if .[1]==null or .[1]=={} then [] else [.[1]] end)
+            (.[0] // []) as $c |
+            (.[1] // null) as $h |
+            ($c + (if $h==null then [] else [$h] end))
             | map(select(.id?))
             | unique_by(.id)
             | sort_by(.timestamp // "")
@@ -33,31 +33,21 @@ jobs:
 
           repo_short="$(awk -F/ '{print ($2?$2:$0)}' <<< "$REPO")"
 
-          jq -c '.[] | {id, message, timestamp, author}' list.json | while read -r c; do
+          jq -c '.[] | {message, timestamp, author}' list.json | while read -r c; do
             msg="$(jq -r '.message // ""' <<< "$c")"
             ts="$(jq -r '.timestamp // empty' <<< "$c")"
             login="$(jq -r '.author.username // empty' <<< "$c")"
             [ -z "$login" ] && login="$ACTOR_FALLBACK"
 
-            # Time handling
+            # Fallback-safe time; Discord timestamp must be UTC ISO
             if [ -z "$ts" ] || ! date -d "$ts" >/dev/null 2>&1; then ts="$(date -Iseconds)"; fi
-            c_date="$(date -u -d "$ts" +"%Y-%m-%d")"
-            n_date="$(date -u +"%Y-%m-%d")"
-            time_str="$(date -d "$ts" +"%-H:%M")"
-            if [ "$c_date" = "$n_date" ]; then
-              foot_extra="Today $time_str"
-            else
-              date_str="$(date -d "$ts" +"%d/%m/%Y")"
-              foot_extra="$date_str $time_str"
-            fi
             iso_utc="$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")"
+            time_str="$(date -d "$ts" +"%-H:%M")"
 
             jq -n \
               --arg login "$login" \
               --arg msg "$msg" \
-              --arg repo "$repo_short" \
-              --arg branch "$BRANCH" \
-              --arg foot "$repo_short - $BRANCH • $foot_extra" \
+              --arg foot "$repo_short - $BRANCH • $time_str" \
               --arg iso "$iso_utc" \
               '{
                 username: "GitHub",
