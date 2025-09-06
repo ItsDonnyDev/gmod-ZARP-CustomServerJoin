@@ -1,4 +1,4 @@
-name: Discord push
+name: Discord notify
 
 on:
   push:
@@ -49,7 +49,7 @@ jobs:
             iso_utc=$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")
             time_str=$(date -d "$ts" +"%-H:%M")
 
-            # Build payload (black color)
+            # Build payload
             jq -n \
               --arg login "$login" \
               --arg msg "$msg" \
