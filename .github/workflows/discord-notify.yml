@@ -61,8 +61,7 @@ jobs:
                     url: ("https://github.com/" + $login),
                     icon_url: ("https://avatars.githubusercontent.com/" + $login)
                   },
-                  description: ($msg + "\n\n_" + "[`" + $short + "`](" + $curlink + ") • <t:" + $epoch + ":f>_"),
-                  timestamp: $iso
+                  description: ($msg + "\n\n_" + "[`" + $short + "`](" + $curlink + ") • <t:" + $epoch + ":f>_")
                 }]
               }' \
             | curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK" >/dev/null
