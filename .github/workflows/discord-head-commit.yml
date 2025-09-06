@@ -7,7 +7,7 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Post each commit (plus merge head)
+      - name: Post all commits (plus merge) in order
         env:
           WEBHOOK:        ${{ secrets.DISCORD_NOTIFY }}
           REPO:           ${{ github.repository }}
@@ -19,49 +19,51 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Parse commits array
-          echo "$COMMITS_JSON" | jq -e . >/dev/null 2>&1 || echo '[]' > commits.json
-          echo "$COMMITS_JSON" > commits.json
+          # Normalize inputs
+          echo "${COMMITS_JSON:-[]}" | jq 'if .==null then [] else . end' > commits.json
+          echo "${HEAD_JSON:-null}"   | jq '.' > head.json
 
-          # Ensure head_commit is included once
-          head_id=$(echo "$HEAD_JSON" | jq -r '.id')
-          if ! jq -e --arg id "$head_id" 'map(.id)==null or (map(.id) | index($id) == null) | not' commits.json >/dev/null; then
-            # commits was null, use []
-            echo '[]' > commits.json
-          fi
-          if [ -n "$head_id" ] && ! jq -e --arg id "$head_id" 'map(.id) | index($id)' commits.json >/dev/null; then
-            jq -c --argjson head "$HEAD_JSON" '. + [$head]' commits.json > commits2.json && mv commits2.json commits.json
-          fi
+          # Combine commits + head_commit, de-dup by id, sort by timestamp
+          jq -cs '
+            (.[0] // []) + (if .[1]==null or .[1]=={} then [] else [.[1]] end)
+            | map(select(.id?))
+            | unique_by(.id)
+            | sort_by(.timestamp // "")
+          ' commits.json head.json > list.json
 
-          repo_short=$(echo "$REPO" | awk -F/ '{print $2}')
+          repo_short="$(awk -F/ '{print ($2?$2:$0)}' <<< "$REPO")"
 
-          # Post each unique commit (by id)
-          jq -c '.[] | {id, message, timestamp, author}' commits.json | while read -r c; do
-            id=$(echo "$c" | jq -r '.id // empty')
-            msg=$(echo "$c" | jq -r '.message // ""')
-            ts=$(echo "$c" | jq -r '.timestamp // empty')
-            login=$(echo "$c" | jq -r '.author.username // empty')
+          jq -c '.[] | {id, message, timestamp, author}' list.json | while read -r c; do
+            msg="$(jq -r '.message // ""' <<< "$c")"
+            ts="$(jq -r '.timestamp // empty' <<< "$c")"
+            login="$(jq -r '.author.username // empty' <<< "$c")"
             [ -z "$login" ] && login="$ACTOR_FALLBACK"
 
-            # Time formatting
-            # Keep commit timezone for footer; ISO UTC for embed timestamp
-            iso_local="$ts"
-            iso_utc=$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")
-            time_str=$(date -d "$ts" +"%-H:%M")
+            # Time handling
+            if [ -z "$ts" ] || ! date -d "$ts" >/dev/null 2>&1; then ts="$(date -Iseconds)"; fi
+            c_date="$(date -u -d "$ts" +"%Y-%m-%d")"
+            n_date="$(date -u +"%Y-%m-%d")"
+            time_str="$(date -d "$ts" +"%-H:%M")"
+            if [ "$c_date" = "$n_date" ]; then
+              foot_extra="Today $time_str"
+            else
+              date_str="$(date -d "$ts" +"%d/%m/%Y")"
+              foot_extra="$date_str $time_str"
+            fi
+            iso_utc="$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")"
 
-            # Build payload
             jq -n \
               --arg login "$login" \
               --arg msg "$msg" \
               --arg repo "$repo_short" \
               --arg branch "$BRANCH" \
-              --arg foot "$repo_short - $BRANCH • $time_str" \
+              --arg foot "$repo_short - $BRANCH • $foot_extra" \
               --arg iso "$iso_utc" \
               '{
                 username: "GitHub",
                 avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
                 embeds: [{
-                  color: 0x2F81F7,
+                  color: 3113463,
                   author: {
                     name: $login,
                     url: ("https://github.com/" + $login),
