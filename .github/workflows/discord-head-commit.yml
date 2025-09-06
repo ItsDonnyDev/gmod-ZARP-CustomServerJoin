@@ -24,22 +24,31 @@ jobs:
             jq -cs '
               (.[0] // []) as $c | (.[1] // null) as $h |
               ($c + (if $h==null then [] else [$h] end))
-              | map(select(.id?)) | unique_by(.id) | sort_by(.timestamp // "")
+              | map(select(.id?))
+              | unique_by(.id)
+              | sort_by(.timestamp // "")
             ' <(printf '%s' "${COMMITS_JSON:-[]}") <(printf '%s' "${HEAD_JSON:-null}")
           )"
 
-          jq -c '.[] | {id, message, timestamp, author}' <<< "$combined" | while read -r c; do
+          jq -c '.[] | {id, url, message, timestamp, author}' <<< "$combined" | while read -r c; do
             id="$(jq -r '.id // empty' <<< "$c")"
+            url="$(jq -r '.url // empty' <<< "$c")"
+            [ -z "$url" ] && url="https://github.com/$REPO/commit/$id"
             short="${id:0:7}"
-            url="https://github.com/$REPO/commit/$id"
             msg="$(jq -r '.message // ""' <<< "$c")"
             ts="$(jq -r '.timestamp // empty' <<< "$c")"
+            login="$(jq -r '.author.username // empty' <<< "$c")"
+            [ -z "$login" ] && login="$ACTOR_FALLBACK"
+            [ -z "$ts" ] && ts="$(date -Iseconds)"
+            iso="$(date -u -d "$ts" +'%Y-%m-%dT%H:%M:%SZ')"
 
             jq -n \
-              --arg login "$(jq -r --arg fb "$ACTOR_FALLBACK" '(.author.username // "") | if length==0 then $fb else . end' <<< "$c")" \
-              --arg desc "[$short]($url)\n$msg" \
-              --arg foot "$repo_short - $BRANCH" \
-              --arg iso  "$(date -u -d "${ts:-$(date -Iseconds)}" +'%Y-%m-%dT%H:%M:%SZ')" \
+              --arg login "$login" \
+              --arg short "$short" \
+              --arg url   "$url" \
+              --arg msg   "$msg" \
+              --arg foot  "$repo_short - $BRANCH" \
+              --arg iso   "$iso" \
               '{
                 username: "GitHub",
                 avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
@@ -50,7 +59,7 @@ jobs:
                     url: ("https://github.com/" + $login),
                     icon_url: ("https://avatars.githubusercontent.com/" + $login)
                   },
-                  description: $desc,
+                  description: ("[" + $short + "](" + $url + ")" + "\n" + $msg),
                   footer: { text: $foot },
                   timestamp: $iso
                 }]
