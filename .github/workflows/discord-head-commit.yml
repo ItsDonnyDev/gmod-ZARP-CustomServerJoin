@@ -21,7 +21,7 @@ jobs:
           echo "${COMMITS_JSON:-[]}"  > commits.json
           echo "${HEAD_JSON:-null}"   > head.json
 
-          # Combine commits + head_commit, de-dup by id, sort by timestamp
+          # Combine commits + head, de-dup, sort by timestamp
           jq -cs '
             (.[0] // []) as $c |
             (.[1] // null) as $h |
@@ -39,15 +39,14 @@ jobs:
             login="$(jq -r '.author.username // empty' <<< "$c")"
             [ -z "$login" ] && login="$ACTOR_FALLBACK"
 
-            # Fallback-safe time; Discord timestamp must be UTC ISO
+            # Ensure valid timestamp; Discord uses this to render "Today at HH:MM"
             if [ -z "$ts" ] || ! date -d "$ts" >/dev/null 2>&1; then ts="$(date -Iseconds)"; fi
             iso_utc="$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")"
-            time_str="$(date -d "$ts" +"%-H:%M")"
 
             jq -n \
               --arg login "$login" \
               --arg msg "$msg" \
-              --arg foot "$repo_short - $BRANCH • $time_str" \
+              --arg foot "$repo_short - $BRANCH" \
               --arg iso "$iso_utc" \
               '{
                 username: "GitHub",
