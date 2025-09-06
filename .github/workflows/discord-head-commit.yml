@@ -19,49 +19,43 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "${COMMITS_JSON:-[]}" > commits.json
-          head_id=$(echo "${HEAD_JSON:-null}" | jq -r '.id // empty' || true)
+          # Parse commits array
+          echo "$COMMITS_JSON" | jq -e . >/dev/null 2>&1 || echo '[]' > commits.json
+          echo "$COMMITS_JSON" > commits.json
 
-          # Ensure head_commit is present exactly once
+          # Ensure head_commit is included once
+          head_id=$(echo "$HEAD_JSON" | jq -r '.id')
+          if ! jq -e --arg id "$head_id" 'map(.id)==null or (map(.id) | index($id) == null) | not' commits.json >/dev/null; then
+            # commits was null, use []
+            echo '[]' > commits.json
+          fi
           if [ -n "$head_id" ] && ! jq -e --arg id "$head_id" 'map(.id) | index($id)' commits.json >/dev/null; then
-            jq -c --argjson head "${HEAD_JSON:-{}}" '. + [$head]' commits.json > commits2.json && mv commits2.json commits.json
+            jq -c --argjson head "$HEAD_JSON" '. + [$head]' commits.json > commits2.json && mv commits2.json commits.json
           fi
 
-          # Sort chronologically
-          jq -c 'sort_by(.timestamp // "")' commits.json > commits_sorted.json
+          repo_short=$(echo "$REPO" | awk -F/ '{print $2}')
 
-          repo_short=$(echo "$REPO" | awk -F/ '{print ($2?$2:$0)}')
-
-          last_id=""
-          jq -c '.[] | {id, message, timestamp, author}' commits_sorted.json | while read -r c; do
+          # Post each unique commit (by id)
+          jq -c '.[] | {id, message, timestamp, author}' commits.json | while read -r c; do
             id=$(echo "$c" | jq -r '.id // empty')
-            [ -n "$id" ] && [ "$id" = "$last_id" ] && continue
-            last_id="$id"
-
             msg=$(echo "$c" | jq -r '.message // ""')
             ts=$(echo "$c" | jq -r '.timestamp // empty')
             login=$(echo "$c" | jq -r '.author.username // empty')
             [ -z "$login" ] && login="$ACTOR_FALLBACK"
 
-            # Dynamic footer: Today H:MM or DD/MM/YYYY H:MM (commit's timezone)
-            c_date=$(date -u -d "$ts" +"%Y-%m-%d")
-            n_date=$(date -u +"%Y-%m-%d")
-            time_str=$(date -d "$ts" +"%-H:%M")
-            if [ "$c_date" = "$n_date" ]; then
-              foot_extra="Today $time_str"
-            else
-              date_str=$(date -d "$ts" +"%d/%m/%Y")
-              foot_extra="$date_str $time_str"
-            fi
+            # Time formatting
+            # Keep commit timezone for footer; ISO UTC for embed timestamp
+            iso_local="$ts"
             iso_utc=$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")
+            time_str=$(date -d "$ts" +"%-H:%M")
 
+            # Build payload (black color)
             jq -n \
-              --arg appicon "${APP_ICON_URL}" \
               --arg login "$login" \
               --arg msg "$msg" \
               --arg repo "$repo_short" \
               --arg branch "$BRANCH" \
-              --arg foot "$repo_short - $BRANCH • $foot_extra" \
+              --arg foot "$repo_short - $BRANCH • $time_str" \
               --arg iso "$iso_utc" \
               '{
                 username: "GitHub",
