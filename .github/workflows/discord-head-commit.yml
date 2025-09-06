@@ -10,20 +10,40 @@ jobs:
       - name: Post head commit only (handles merges)
         shell: pwsh
         env:
-          API_URL:     ${{ secrets.DISCORD_NOTIFY }}
+          WEBHOOK:     ${{ secrets.DISCORD_NOTIFY }}
           REPO:        ${{ github.repository }}
           BRANCH:      ${{ github.ref_name }}
-          # Prefer the username from the head commit; fallback to actor (works for merges)
           ACTOR_LOGIN: ${{ github.event.head_commit.author.username || github.actor }}
           MSG:         ${{ toJSON(github.event.head_commit.message) }}
           TS:          ${{ github.event.head_commit.timestamp }}
         run: |
-          if (-not $env:TS) { exit 0 }  # no head_commit (e.g., tag/branch delete)
+          if (-not $env:TS) { exit 0 }  # no head_commit (e.g., tag delete)
+
+          # Parse time from the commit (keeps its timezone), format footer pieces
+          $dto      = [DateTimeOffset]::Parse($env:TS)
+          $dateStr  = $dto.ToString('dd/MM/yyyy')
+          $timeStr  = $dto.ToString('H:mm')
+          $isoUtc   = $dto.ToUniversalTime().ToString('o')
+
+          # Repo short name for footer
+          $repoParts = $env:REPO -split '/'
+          $repoName  = ($repoParts.Count -ge 2) ? $repoParts[1] : $env:REPO
+
+          # Build embed to match your format
           $payload = @{
-            repo      = $env:REPO
-            branch    = $env:BRANCH
-            actor     = $env:ACTOR_LOGIN
-            message   = $env:MSG
-            timestamp = $env:TS
-          } | ConvertTo-Json -Depth 5
-          Invoke-RestMethod -Uri $env:API_URL -Method Post -ContentType 'application/json' -Body $payload | Out-Null
+            username   = 'GitHub'  # app display name
+            avatar_url = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png' # app icon
+            embeds     = @(@{
+              color       = 0x2F81F7
+              author      = @{
+                name     = $env:ACTOR_LOGIN
+                url      = "https://github.com/$($env:ACTOR_LOGIN)"
+                icon_url = "https://avatars.githubusercontent.com/$($env:ACTOR_LOGIN)"
+              }
+              description = $env:MSG
+              footer      = @{ text = "$repoName - $($env:BRANCH) • $dateStr • $timeStr" }
+              timestamp   = $isoUtc
+            })
+          } | ConvertTo-Json -Depth 6
+
+          Invoke-RestMethod -Uri $env:WEBHOOK -Method Post -ContentType 'application/json' -Body $payload | Out-Null
