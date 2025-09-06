@@ -42,11 +42,11 @@ jobs:
 
             jq -n \
               --arg login "$(jq -r --arg fb "$ACTOR_FALLBACK" '(.author.username // "") | if length==0 then $fb else . end' <<< "$c")" \
-              --arg short "$short" \
-              --arg url   "$url" \
               --arg msg   "$msg" \
               --arg title "${repo_short} - ${BRANCH}" \
               --arg link  "https://github.com/${REPO}/tree/${BRANCH}" \
+              --arg short "$short" \
+              --arg curlink "$url" \
               --arg iso   "$(date -u -d "${ts:-$(date -Iseconds)}" +'%Y-%m-%dT%H:%M:%SZ')" \
               '{
                 username: "GitHub",
@@ -60,8 +60,8 @@ jobs:
                     url: ("https://github.com/" + $login),
                     icon_url: ("https://avatars.githubusercontent.com/" + $login)
                   },
-                  description: ("[`" + $short + "`](" + $url + ")\n" + $msg),
-                  footer: { text: ("[`" + $short + "`] • " + $title) },
+                  description: $msg,
+                  footer: { text: ("[`" + $short + "`](" + $curlink + ")") },
                   timestamp: $iso
                 }]
               }' \
