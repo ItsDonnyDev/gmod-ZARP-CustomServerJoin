@@ -1,49 +1,77 @@
-name: Discord head-commit
+name: Discord push (all commits + merge)
 
 on:
   push:
 
 jobs:
   notify:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
-      - name: Post head commit only (handles merges)
-        shell: pwsh
+      - name: Post each commit (plus merge head)
         env:
-          WEBHOOK:     ${{ secrets.DISCORD_NOTIFY }}
-          REPO:        ${{ github.repository }}
-          BRANCH:      ${{ github.ref_name }}
-          ACTOR_LOGIN: ${{ github.event.head_commit.author.username || github.actor }}
-          MSG:         ${{ toJSON(github.event.head_commit.message) }}
-          TS:          ${{ github.event.head_commit.timestamp }}
+          WEBHOOK:        ${{ secrets.DISCORD_NOTIFY }}
+          REPO:           ${{ github.repository }}
+          BRANCH:         ${{ github.ref_name }}
+          COMMITS_JSON:   ${{ toJson(github.event.commits) }}
+          HEAD_JSON:      ${{ toJson(github.event.head_commit) }}
+          ACTOR_FALLBACK: ${{ github.actor }}
+        shell: bash
         run: |
-          if (-not $env:TS) { exit 0 }  # no head_commit (e.g., tag delete)
+          set -euo pipefail
 
-          # Parse time from the commit (keeps its timezone), format footer pieces
-          $dto      = [DateTimeOffset]::Parse($env:TS)
-          $dateStr  = $dto.ToString('dd/MM/yyyy')
-          $timeStr  = $dto.ToString('H:mm')
-          $isoUtc   = $dto.ToUniversalTime().ToString('o')
+          # Parse commits array
+          echo "$COMMITS_JSON" | jq -e . >/dev/null 2>&1 || echo '[]' > commits.json
+          echo "$COMMITS_JSON" > commits.json
 
-          # Repo short name for footer
-          $repoParts = $env:REPO -split '/'
-          $repoName  = ($repoParts.Count -ge 2) ? $repoParts[1] : $env:REPO
+          # Ensure head_commit is included once
+          head_id=$(echo "$HEAD_JSON" | jq -r '.id')
+          if ! jq -e --arg id "$head_id" 'map(.id)==null or (map(.id) | index($id) == null) | not' commits.json >/dev/null; then
+            # commits was null, use []
+            echo '[]' > commits.json
+          fi
+          if [ -n "$head_id" ] && ! jq -e --arg id "$head_id" 'map(.id) | index($id)' commits.json >/dev/null; then
+            jq -c --argjson head "$HEAD_JSON" '. + [$head]' commits.json > commits2.json && mv commits2.json commits.json
+          fi
 
-          # Build embed to match your format
-          $payload = @{
-            username   = 'GitHub'  # app display name
-            avatar_url = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png' # app icon
-            embeds     = @(@{
-              color       = 0x2F81F7
-              author      = @{
-                name     = $env:ACTOR_LOGIN
-                url      = "https://github.com/$($env:ACTOR_LOGIN)"
-                icon_url = "https://avatars.githubusercontent.com/$($env:ACTOR_LOGIN)"
-              }
-              description = $env:MSG
-              footer      = @{ text = "$repoName - $($env:BRANCH) • $dateStr • $timeStr" }
-              timestamp   = $isoUtc
-            })
-          } | ConvertTo-Json -Depth 6
+          repo_short=$(echo "$REPO" | awk -F/ '{print $2}')
 
-          Invoke-RestMethod -Uri $env:WEBHOOK -Method Post -ContentType 'application/json' -Body $payload | Out-Null
+          # Post each unique commit (by id)
+          jq -c '.[] | {id, message, timestamp, author}' commits.json | while read -r c; do
+            id=$(echo "$c" | jq -r '.id // empty')
+            msg=$(echo "$c" | jq -r '.message // ""')
+            ts=$(echo "$c" | jq -r '.timestamp // empty')
+            login=$(echo "$c" | jq -r '.author.username // empty')
+            [ -z "$login" ] && login="$ACTOR_FALLBACK"
+
+            # Time formatting
+            # Keep commit timezone for footer; ISO UTC for embed timestamp
+            iso_local="$ts"
+            iso_utc=$(date -u -d "$ts" +"%Y-%m-%dT%H:%M:%SZ")
+            date_str=$(date -d "$ts" +"%d/%m/%Y")
+            time_str=$(date -d "$ts" +"%-H:%M")
+
+            # Build payload (black color)
+            jq -n \
+              --arg login "$login" \
+              --arg msg "$msg" \
+              --arg repo "$repo_short" \
+              --arg branch "$BRANCH" \
+              --arg foot "$repo_short - $BRANCH • $date_str $time_str" \
+              --arg iso "$iso_utc" \
+              '{
+                username: "GitHub",
+                avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                embeds: [{
+                  color: 0,
+                  author: {
+                    name: $login,
+                    url: ("https://github.com/" + $login),
+                    icon_url: ("https://avatars.githubusercontent.com/" + $login)
+                  },
+                  description: $msg,
+                  footer: { text: $foot },
+                  timestamp: $iso
+                }]
+              }' \
+            | curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK" >/dev/null
+          done
