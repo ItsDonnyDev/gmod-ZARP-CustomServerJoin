@@ -60,7 +60,8 @@ jobs:
                     url: ("https://github.com/" + $login),
                     icon_url: ("https://avatars.githubusercontent.com/" + $login)
                   },
-                  description: ("[`" + $short + "`](" + $url + ")\n" + $msg + "\n\n\u200B"),
+                  description: ("[`" + $short + "`](" + $url + ")\n" + $msg),
+                  footer: { text: ("[`" + $short + "`] • " + $title) },
                   timestamp: $iso
                 }]
               }' \
