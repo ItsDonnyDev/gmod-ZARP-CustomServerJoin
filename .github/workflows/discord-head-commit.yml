@@ -24,9 +24,7 @@ jobs:
             jq -cs '
               (.[0] // []) as $c | (.[1] // null) as $h |
               ($c + (if $h==null then [] else [$h] end))
-              | map(select(.id?))
-              | unique_by(.id)
-              | sort_by(.timestamp // "")
+              | map(select(.id?)) | unique_by(.id) | sort_by(.timestamp // "")
             ' <(printf '%s' "${COMMITS_JSON:-[]}") <(printf '%s' "${HEAD_JSON:-null}")
           )"
 
@@ -59,7 +57,7 @@ jobs:
                     url: ("https://github.com/" + $login),
                     icon_url: ("https://avatars.githubusercontent.com/" + $login)
                   },
-                  description: ("[" + $short + "](" + $url + ")" + "\n\n" + $msg),
+                  description: ("[`" + $short + "`](" + $url + ")" + "\n" + $msg),
                   footer: { text: $foot },
                   timestamp: $iso
                 }]
