@@ -41,26 +41,27 @@ jobs:
             iso="$(date -u -d "$ts" +'%Y-%m-%dT%H:%M:%SZ')"
 
             jq -n \
-              --arg login "$login" \
+              --arg login "$(jq -r --arg fb "$ACTOR_FALLBACK" '(.author.username // "") | if length==0 then $fb else . end' <<< "$c")" \
               --arg short "$short" \
               --arg url   "$url" \
               --arg msg   "$msg" \
-              --arg foot  "$repo_short - $BRANCH" \
-              --arg iso   "$iso" \
+              --arg title "${repo_short} - ${BRANCH}" \
+              --arg link  "https://github.com/${REPO}/tree/${BRANCH}" \
+              --arg iso   "$(date -u -d "${ts:-$(date -Iseconds)}" +'%Y-%m-%dT%H:%M:%SZ')" \
               '{
                 username: "GitHub",
                 avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
                 embeds: [{
+                  title: $title,
+                  url:   $link,
                   color: 3113463,
                   author: {
                     name: $login,
                     url: ("https://github.com/" + $login),
                     icon_url: ("https://avatars.githubusercontent.com/" + $login)
                   },
-                  description: ("[`" + $short + "`](" + $url + ")" + "\n" + $msg),
-                  footer: { text: $foot },
+                  description: ("[`" + $short + "`](" + $url + ")\n" + $msg + "\n\n\u200B"),
                   timestamp: $iso
                 }]
               }' \
             | curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK" >/dev/null
-          done
