@@ -48,6 +48,7 @@ jobs:
               --arg short "$short" \
               --arg curlink "$url" \
               --arg iso   "$(date -u -d "${ts:-$(date -Iseconds)}" +'%Y-%m-%dT%H:%M:%SZ')" \
+              --arg epoch "$(date    -d "${ts:-$(date -Iseconds)}" +%s)" \
               '{
                 username: "GitHub",
                 avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
@@ -60,15 +61,9 @@ jobs:
                     url: ("https://github.com/" + $login),
                     icon_url: ("https://avatars.githubusercontent.com/" + $login)
                   },
-                  description: $msg,
-                  footer: { text: "\u200B" },        # keep timestamp, no visible text
+                  description: ($msg + "\n\n_" + "[`" + $short + "`](" + $curlink + ") • <t:" + $epoch + ":f>_"),
                   timestamp: $iso
-                }],
-                components: [
-                  { "type": 1, "components": [
-                      { "type": 2, "style": 5, "label": $short, "url": $curlink }  # clickable SHA
-                  ]}
-                ]
+                }]
               }' \
             | curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK" >/dev/null
           done
