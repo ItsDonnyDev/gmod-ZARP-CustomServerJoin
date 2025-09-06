@@ -6,7 +6,7 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Post all commits (plus merge) in order
+      - name: Post all in order
         env:
           WEBHOOK:        ${{ secrets.DISCORD_NOTIFY }}
           REPO:           ${{ github.repository }}
