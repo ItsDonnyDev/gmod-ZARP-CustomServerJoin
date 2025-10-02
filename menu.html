@@ -11,8 +11,6 @@
 	<link rel="stylesheet" type="text/css" href="css/menu/Servers.css" />
 	<link rel="stylesheet" type="text/css" href="css/Workshop.css" />
 
-	<script type="text/javascript" src="js/lua.js"></script>
-
 	<script type="text/javascript" src="js/thirdparty/jquery.js"></script>
 	<script type="text/javascript" src="js/thirdparty/angular.js"></script>
 	<script type="text/javascript" src="js/thirdparty/angular-route.js"></script>
@@ -93,85 +91,85 @@
 					ng-src='../resource/localization/{{Language}}.png'><span></span></div>
 			<div class="button bigicon" ng-click="ToggleGamemodes()"><img
 					ng-src='../gamemodes/{{Gamemode}}/icon24.png'><span>{{GamemodeTitle}}</span></div>
-
-
 		</div>
 
-		<ul class="gamemode_list popup">
-			<li ng-repeat="gm in Gamemodes|filter:{menusystem:true}|orderBy:'name'" ng-click="SelectGamemode( gm )">
-				<img ng-src='../gamemodes/{{gm.name}}/icon24.png' loading="lazy"><span>{{gm.title}}</span>
-			</li>
-		</ul>
+	</div>
 
-		<ul class="language_list popup">
-			<li ng-repeat="lang in Languages" ng-click="SelectLanguage( lang )">
-				<img ng-src='../resource/localization/{{lang}}.png' loading="lazy">
-			</li>
-		</ul>
+	<ul class="gamemode_list popup">
+		<li ng-repeat="gm in Gamemodes|filter:{menusystem:true}|orderBy:'name'" ng-click="SelectGamemode( gm )">
+			<img ng-src='../gamemodes/{{gm.name}}/icon24.png' loading="lazy"><span>{{gm.title}}</span>
+		</li>
+	</ul>
 
-		<ul class="games_list popup">
+	<ul class="language_list popup">
+		<li ng-repeat="lang in Languages" ng-click="SelectLanguage( lang )">
+			<img ng-src='../resource/localization/{{lang}}.png' loading="lazy">
+		</li>
+	</ul>
 
-			<li class="notowned"><img src='img/notowned.png' width="16" height="16" loading="lazy"> <span
-					ng-Tranny="'game_not_owned'"></span></li>
-			<li class="notinstalled"><img src='img/notinstalled.png' width="16" height="16" loading="lazy"> <span
-					ng-Tranny="'game_not_installed'"></span></li>
-			<hr />
-			<li ng-repeat="game in Games|orderBy:['-installed','-owned','title']"
-				class="game-item {{ !game.owned ? 'notowned' : '' }} {{ !game.installed ? 'notinstalled' : '' }}">
-				<input type=checkbox ng-model="game.mounted" ng-show="game.installed"
-					ng-change="GameMountChanged( game )" />
-				<img src='img/notowned.png' ng-show="!game.owned" width="16" height="16" loading="lazy">
-				<img src='img/notinstalled.png' ng-show="game.owned && !game.installed" width="16" height="16"
-					loading="lazy">
-				<img ng-src='../materials/games/16/{{game.folder}}.png' style="margin-left: 20px;" loading="lazy">
-				<span style="margin-left: 16px;">{{game.title}}</span>
-			</li>
+	<ul class="games_list popup">
 
-		</ul>
+		<li class="notowned"><img src='img/notowned.png' width="16" height="16" loading="lazy"> <span
+				ng-Tranny="'game_not_owned'"></span></li>
+		<li class="notinstalled"><img src='img/notinstalled.png' width="16" height="16" loading="lazy"> <span
+				ng-Tranny="'game_not_installed'"></span></li>
+		<hr />
+		<li ng-repeat="game in Games|orderBy:['-installed','-owned','title']"
+			class="game-item {{ !game.owned ? 'notowned' : '' }} {{ !game.installed ? 'notinstalled' : '' }}">
+			<input type=checkbox ng-model="game.mounted" ng-show="game.installed"
+				ng-change="GameMountChanged( game )" />
+			<img src='img/notowned.png' ng-show="!game.owned" width="16" height="16" loading="lazy">
+			<img src='img/notinstalled.png' ng-show="game.owned && !game.installed" width="16" height="16"
+				loading="lazy">
+			<img ng-src='../materials/games/16/{{game.folder}}.png' style="margin-left: 20px;" loading="lazy">
+			<span style="margin-left: 16px;">{{game.title}}</span>
+		</li>
 
-		<ul class="kinect_settings popup">
+	</ul>
 
-			<li>
-				<div>
+	<ul class="kinect_settings popup">
 
-					<p>
-						<label style="display: block">
-							<input type="checkbox" ng-model="kinect.show_color" ng-change="kinect.update()"> <span
-								ng-Tranny="'motionsensor.showcolor'"></span>
+		<li>
+			<div>
+
+				<p>
+					<label style="display: block">
+						<input type="checkbox" ng-model="kinect.show_color" ng-change="kinect.update()"> <span
+							ng-Tranny="'motionsensor.showcolor'"></span>
+					</label>
+				</p>
+
+
+				<div ng-show="kinect.show_color">
+
+					<span ng-Tranny="'motionsensor.colorpos'"></span>
+
+					<p style="margin-left: 5px;">
+						<label ng-repeat="option in kinect.color_options" style="display: block">
+							<input type="radio" name="kinect.color" ng-model="kinect.color" value="{{option}}"
+								ng-change="kinect.update()">
+							<span ng-Tranny="'motionsensor.showcolor.'+ option"></span>
 						</label>
 					</p>
-
-
-					<div ng-show="kinect.show_color">
-
-						<span ng-Tranny="'motionsensor.colorpos'"></span>
-
-						<p style="margin-left: 5px;">
-							<label ng-repeat="option in kinect.color_options" style="display: block">
-								<input type="radio" name="kinect.color" ng-model="kinect.color" value="{{option}}"
-									ng-change="kinect.update()">
-								<span ng-Tranny="'motionsensor.showcolor.'+ option"></span>
-							</label>
-						</p>
-					</div>
-
-					<div ng-show="kinect.show_color">
-						<span ng-Tranny="'motionsensor.colorsize'"></span>
-
-						<p style="margin-left: 5px;">
-							<label ng-repeat="option in kinect.size_options" style="display: block">
-								<input type="radio" name="kinect.color_size" ng-model="kinect.color_size"
-									value="{{option}}" ng-change="kinect.update()">
-								<span ng-Tranny="'motionsensor.colorsize.'+ option"></span>
-							</label>
-						</p>
-					</div>
-
 				</div>
 
-			</li>
+				<div ng-show="kinect.show_color">
+					<span ng-Tranny="'motionsensor.colorsize'"></span>
 
-		</ul>
+					<p style="margin-left: 5px;">
+						<label ng-repeat="option in kinect.size_options" style="display: block">
+							<input type="radio" name="kinect.color_size" ng-model="kinect.color_size" value="{{option}}"
+								ng-change="kinect.update()">
+							<span ng-Tranny="'motionsensor.colorsize.'+ option"></span>
+						</label>
+					</p>
+				</div>
+
+			</div>
+
+		</li>
+
+	</ul>
 
 </body>
 
